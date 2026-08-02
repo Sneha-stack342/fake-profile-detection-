@@ -1,0 +1,1770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProfileGuard — Fake Profile Detection System</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #070d1f;
+    --surface: #0e1630;
+    --surface2: #131e3a;
+    --surface3: #1a2848;
+    --accent: #a78bfa;
+    --accent2: #f472b6;
+    --accent3: #818cf8;
+    --accent-glow: rgba(167,139,250,0.18);
+    --text: #f1f0ff;
+    --text-soft: #c4bef5;
+    --muted: #6b7099;
+    --border: rgba(167,139,250,0.12);
+    --border-soft: rgba(167,139,250,0.08);
+    --glow: 0 0 40px rgba(167,139,250,0.15);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: linear-gradient(160deg, #070d1f 0%, #0a1128 40%, #0d1535 70%, #080e22 100%);
+    background-attachment: fixed;
+    color: var(--text);
+    overflow-x: hidden;
+    line-height: 1.65;
+  }
+
+  /* Subtle noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  /* Ambient gradient mesh */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 15% 0%, rgba(139,92,246,0.1) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 85% 100%, rgba(244,114,182,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 40% at 50% 45%, rgba(129,140,248,0.06) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+ 
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 52px;
+    background: rgba(7,13,31,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .logo {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800;
+    font-size: 1.2rem;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, var(--accent), #7c3aed);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem;
+    animation: pulse-glow 3s ease-in-out infinite;
+    box-shadow: 0 0 20px rgba(167,139,250,0.4);
+  }
+
+  .logo span { color: var(--accent); }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 12px rgba(167,139,250,0.4); }
+    50% { box-shadow: 0 0 32px rgba(167,139,250,0.7); }
+  }
+
+  nav ul { list-style: none; display: flex; gap: 8px; }
+  nav a {
+    text-decoration: none;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    letter-spacing: 0.2px;
+  }
+  nav a:hover { color: var(--text-soft); background: rgba(255,255,255,0.05); }
+
+  .nav-cta {
+    background: var(--accent) !important;
+    color: #070d1f !important;
+    font-weight: 700 !important;
+    padding: 8px 20px !important;
+    border-radius: 8px !important;
+  }
+  .nav-cta:hover {
+    background: #c4b5fd !important;
+    color: #070d1f !important;
+    transform: none !important;
+  }
+
+
+  .hero {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 120px 48px 80px;
+    text-align: center;
+    overflow: hidden;
+  }
+
+  .hero-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(100px);
+    pointer-events: none;
+  }
+  .orb1 {
+    width: 600px; height: 400px;
+    background: radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 70%);
+    top: -80px; left: 50%;
+    transform: translateX(-50%);
+    animation: float1 10s ease-in-out infinite;
+  }
+  .orb2 {
+    width: 350px; height: 350px;
+    background: radial-gradient(circle, rgba(244,114,182,0.09) 0%, transparent 70%);
+    bottom: 80px; right: 8%;
+    animation: float2 12s ease-in-out infinite;
+  }
+  .orb3 {
+    width: 250px; height: 250px;
+    background: radial-gradient(circle, rgba(129,140,248,0.08) 0%, transparent 70%);
+    top: 30%; left: 5%;
+    animation: float2 14s ease-in-out infinite reverse;
+  }
+
+  @keyframes float1 {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-25px); }
+  }
+  @keyframes float2 {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-18px) scale(1.04); }
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(52,211,153,0.25);
+    background: rgba(52,211,153,0.07);
+    color: var(--accent3);
+    padding: 7px 18px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    border-radius: 40px;
+    margin-bottom: 36px;
+    animation: fadeInDown 0.6s ease both;
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    background: var(--accent3);
+    border-radius: 50%;
+    animation: blink 2s ease-in-out infinite;
+    box-shadow: 0 0 8px var(--accent3);
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+  }
+
+  h1 {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: clamp(3rem, 6.5vw, 6rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -2.5px;
+    margin-bottom: 22px;
+    animation: fadeInUp 0.7s ease 0.1s both;
+  }
+
+  .h1-line1 { display: block; color: var(--text); }
+  .h1-line2 {
+    display: block;
+    background: linear-gradient(135deg, #a78bfa 0%, #c084fc 50%, #f472b6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .h1-accent {
+    background: linear-gradient(90deg, #a78bfa, #818cf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-sub {
+    max-width: 580px;
+    color: var(--text-soft);
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.75;
+    margin-bottom: 48px;
+    animation: fadeInUp 0.7s ease 0.2s both;
+    opacity: 0.85;
+  }
+
+  .hero-ctas {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+    animation: fadeInUp 0.7s ease 0.3s both;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #a78bfa, #7c3aed);
+    color: #f1f0ff;
+    border: none;
+    padding: 14px 32px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    border-radius: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 20px rgba(124,58,237,0.35);
+  }
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #c4b5fd, #a78bfa);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(167,139,250,0.45);
+  }
+
+  .btn-outline {
+    background: rgba(255,255,255,0.04);
+    color: var(--text-soft);
+    border: 1px solid var(--border-soft);
+    padding: 14px 32px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+  }
+  .btn-outline:hover {
+    border-color: rgba(56,189,248,0.3);
+    color: var(--accent);
+    background: rgba(56,189,248,0.05);
+  }
+
+  .hero-stats {
+    display: flex;
+    gap: 0;
+    margin-top: 72px;
+    animation: fadeInUp 0.7s ease 0.4s both;
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    background: rgba(17,24,39,0.7);
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+  }
+  .stat {
+    text-align: center;
+    padding: 24px 48px;
+    position: relative;
+  }
+  .stat:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: 0; top: 20%; bottom: 20%;
+    width: 1px;
+    background: var(--border-soft);
+  }
+  .stat-num {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--accent);
+    display: block;
+    letter-spacing: -1px;
+  }
+  .stat-label {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--muted);
+    margin-top: 4px;
+    display: block;
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(22px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ─── SECTION STYLES ─── */
+  section {
+    position: relative;
+    z-index: 1;
+    padding: 100px 48px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .section-tag {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-tag::before {
+    content: '';
+    width: 20px; height: 2px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .section-title {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: clamp(1.9rem, 3.5vw, 2.8rem);
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    margin-bottom: 18px;
+    line-height: 1.1;
+    color: var(--text);
+  }
+
+  /* ─── ANALYZER SECTION ─── */
+  .analyzer-section {
+    padding: 80px 48px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .analyzer-wrapper {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 16px;
+    padding: 48px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+
+  .analyzer-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.5;
+  }
+
+  .analyzer-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 36px;
+  }
+
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-bottom: 18px;
+  }
+
+  label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  input, select, textarea {
+    background: var(--surface2);
+    border: 1px solid var(--border-soft);
+    color: var(--text);
+    padding: 11px 15px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 400;
+    width: 100%;
+    outline: none;
+    border-radius: var(--radius-sm);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: rgba(167,139,250,0.45);
+    box-shadow: 0 0 0 3px rgba(167,139,250,0.1);
+  }
+
+  select option { background: var(--surface2); }
+
+  .slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+
+  .slider-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--surface3);
+    border-radius: 4px;
+    padding: 0;
+    cursor: pointer;
+    border: none;
+    box-shadow: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(167,139,250,0.55);
+    transition: transform 0.15s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+  }
+  input[type="range"]:focus { box-shadow: none; border: none; background: var(--surface3); }
+
+  .slider-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 50px;
+    text-align: right;
+  }
+
+  section {
+    scroll-margin-top: 120px;
+  }
+
+  .analyze-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #a78bfa, #7c3aed);
+    color: #f1f0ff;
+    border: none;
+    padding: 16px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    border-radius: 10px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 20px rgba(124,58,237,0.3);
+  }
+  .analyze-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(167,139,250,0.45);
+    background: linear-gradient(135deg, #c4b5fd, #a78bfa);
+  }
+  .analyze-btn:active { transform: translateY(0); }
+
+  /* ─── RESULT PANEL ─── */
+  .result-panel {
+    background: var(--surface2);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 28px;
+    height: 100%;
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .result-header {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-soft);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .result-idle {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: var(--muted);
+  }
+
+  .idle-icon {
+    width: 64px; height: 64px;
+    border: 1px solid var(--border-soft);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.8rem;
+    background: var(--surface3);
+    animation: rotate-slow 14s linear infinite;
+  }
+  @keyframes rotate-slow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .idle-text {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  /* VERDICT */
+  .verdict { display: none; }
+  .verdict.active { display: flex; flex-direction: column; gap: 20px; }
+
+  .verdict-score {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .score-ring {
+    position: relative;
+    width: 100px; height: 100px;
+  }
+
+  .score-ring svg {
+    transform: rotate(-90deg);
+    width: 100%; height: 100%;
+  }
+
+  .score-ring circle {
+    fill: none;
+    stroke-width: 6;
+    stroke-linecap: round;
+  }
+
+  .ring-bg { stroke: var(--surface3); }
+  .ring-fill {
+    stroke: var(--accent2);
+    stroke-dasharray: 283;
+    stroke-dashoffset: 283;
+    transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .score-num {
+    position: absolute;
+    inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+
+  .verdict-label {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+
+  .fake-label { color: var(--accent2); }
+  .real-label { color: var(--accent3); }
+
+  .metric-bars { display: flex; flex-direction: column; gap: 13px; }
+
+  .metric-bar-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .metric-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  .bar-track {
+    height: 5px;
+    background: var(--surface3);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 10px;
+    width: 0%;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .bar-fill.danger { background: linear-gradient(90deg, #fb7185, #f43f5e); }
+  .bar-fill.safe { background: linear-gradient(90deg, #34d399, #10b981); }
+
+  .verdict-flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 2px;
+  }
+
+  .flag {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid;
+  }
+  .flag.red { border-color: rgba(251,113,133,0.35); color: var(--accent2); background: rgba(251,113,133,0.08); }
+  .flag.green { border-color: rgba(52,211,153,0.35); color: var(--accent3); background: rgba(52,211,153,0.08); }
+
+  /* ─── HOW IT WORKS ─── */
+  .how-section { padding: 100px 48px; max-width: 1200px; margin: 0 auto; }
+
+  .pipeline {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: 56px;
+  }
+
+  .pipe-step {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    position: relative;
+    transition: all 0.3s;
+    cursor: default;
+  }
+  .pipe-step:hover {
+    border-color: rgba(167,139,250,0.3);
+    box-shadow: 0 8px 32px rgba(167,139,250,0.1);
+    transform: translateY(-4px);
+  }
+
+  .pipe-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.04);
+    position: absolute;
+    top: 14px; right: 18px;
+    line-height: 1;
+  }
+
+  .pipe-icon {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, rgba(167,139,250,0.15), rgba(167,139,250,0.05));
+    border: 1px solid rgba(167,139,250,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem;
+    margin-bottom: 18px;
+    border-radius: 10px;
+  }
+
+  .pipe-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+
+  .pipe-desc {
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.75;
+  }
+
+  /* ─── FEATURES ─── */
+  .features-section { padding: 100px 48px; max-width: 1200px; margin: 0 auto; }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 56px;
+  }
+
+  .feature-card {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 32px 26px;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .feature-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at top left, rgba(167,139,250,0.07), transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .feature-card:hover {
+    border-color: rgba(167,139,250,0.25);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  }
+  .feature-card:hover::before { opacity: 1; }
+
+  .feat-icon {
+    font-size: 1.8rem;
+    margin-bottom: 18px;
+    display: block;
+  }
+
+  .feat-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: var(--text);
+    letter-spacing: -0.3px;
+  }
+
+  .feat-desc {
+    font-size: 0.8rem;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  /* ─── THREATS ─── */
+  .threats-section { padding: 100px 48px; max-width: 1200px; margin: 0 auto; }
+
+  .threat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-top: 56px;
+  }
+
+  .threat-card {
+    display: flex;
+    gap: 22px;
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 26px;
+    transition: all 0.3s;
+  }
+  .threat-card:hover {
+    border-color: rgba(251,113,133,0.2);
+    box-shadow: 0 8px 32px rgba(251,113,133,0.06);
+  }
+
+  .threat-icon-box {
+    width: 46px; height: 46px;
+    background: rgba(251,113,133,0.08);
+    border: 1px solid rgba(251,113,133,0.15);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    border-radius: 10px;
+  }
+
+  .threat-info h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+    letter-spacing: -0.2px;
+  }
+  .threat-info p {
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.75;
+  }
+
+  /* ─── METRICS ─── */
+  .metrics-section { padding: 100px 48px; max-width: 1200px; margin: 0 auto; }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: 56px;
+  }
+
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 32px 24px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s;
+  }
+
+  .metric-card:hover {
+    border-color: rgba(167,139,250,0.25);
+    transform: translateY(-3px);
+  }
+
+  .metric-card::before {
+    content: attr(data-label);
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    background: rgba(167,139,250,0.1);
+    padding: 6px 12px;
+    color: var(--accent);
+    border-bottom: 1px solid rgba(167,139,250,0.12);
+  }
+
+  .metric-big {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text);
+    display: block;
+    margin-top: 36px;
+    margin-bottom: 8px;
+    letter-spacing: -1px;
+  }
+
+  .metric-sub {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  /* ─── SAMPLE PROFILES ─── */
+  .sample-profiles-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 60px;
+  }
+
+  .sample-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 22px;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .fake-sample:hover { border-color: rgba(251,113,133,0.3); box-shadow: 0 8px 32px rgba(251,113,133,0.08); transform: translateY(-3px); }
+  .real-sample:hover { border-color: rgba(52,211,153,0.3); box-shadow: 0 8px 32px rgba(52,211,153,0.08); transform: translateY(-3px); }
+  .borderline-sample:hover { border-color: rgba(251,191,36,0.3); box-shadow: 0 8px 32px rgba(251,191,36,0.06); transform: translateY(-3px); }
+
+  .sample-top-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 12px 12px 0 0;
+  }
+  .fake-sample .sample-top-bar { background: linear-gradient(90deg, var(--accent2), #f43f5e); }
+  .real-sample .sample-top-bar { background: linear-gradient(90deg, var(--accent3), #10b981); }
+  .borderline-sample .sample-top-bar { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+
+  .sample-avatar {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem;
+  }
+
+  .sample-info { flex: 1; }
+
+  .sample-name {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+    letter-spacing: -0.2px;
+  }
+
+  .sample-platform {
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .sample-badge {
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 3px 9px;
+    border-radius: 20px;
+  }
+  .fake-badge { background: rgba(251,113,133,0.12); color: var(--accent2); border: 1px solid rgba(251,113,133,0.25); }
+  .real-badge { background: rgba(52,211,153,0.1); color: var(--accent3); border: 1px solid rgba(52,211,153,0.25); }
+  .warn-badge { background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); }
+
+  .sample-signals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .sig-pill {
+    font-size: 0.62rem;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+    border: 1px solid;
+  }
+  .sig-pill.red { color: var(--accent2); border-color: rgba(251,113,133,0.25); background: rgba(251,113,133,0.06); }
+  .sig-pill.green { color: var(--accent3); border-color: rgba(52,211,153,0.25); background: rgba(52,211,153,0.06); }
+  .sig-pill.orange { color: #fbbf24; border-color: rgba(251,191,36,0.25); background: rgba(251,191,36,0.06); }
+
+  .sample-desc {
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .sample-arrow {
+    position: absolute;
+    bottom: 16px; right: 18px;
+    font-size: 1rem;
+    color: var(--muted);
+    transition: all 0.3s;
+  }
+  .sample-card:hover .sample-arrow { color: var(--accent); transform: translateX(4px); }
+  .sample-card.active-sample { border-color: rgba(167,139,250,0.5) !important; box-shadow: 0 0 24px rgba(167,139,250,0.15) !important; }
+
+  /* ─── LOADING ─── */
+  .loading { display: none; }
+  .loading.active {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    flex: 1;
+  }
+
+  .loader-bars {
+    display: flex;
+    gap: 5px;
+    align-items: flex-end;
+    height: 40px;
+  }
+  .loader-bar {
+    width: 5px;
+    background: var(--accent);
+    border-radius: 3px;
+    animation: bar-bounce 1s ease-in-out infinite;
+  }
+  .loader-bar:nth-child(1) { animation-delay: 0s; }
+  .loader-bar:nth-child(2) { animation-delay: 0.1s; }
+  .loader-bar:nth-child(3) { animation-delay: 0.2s; }
+  .loader-bar:nth-child(4) { animation-delay: 0.3s; }
+  .loader-bar:nth-child(5) { animation-delay: 0.4s; }
+  .loader-bar:nth-child(6) { animation-delay: 0.5s; }
+
+  @keyframes bar-bounce {
+    0%, 100% { height: 8px; opacity: 0.3; }
+    50% { height: 40px; opacity: 1; }
+  }
+
+  .loader-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--accent);
+    animation: blink 1.5s ease-in-out infinite;
+  }
+
+  /* ─── FOOTER ─── */
+  footer {
+    position: relative;
+    z-index: 1;
+    padding: 40px 48px;
+    border-top: 1px solid var(--border-soft);
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .footer-bottom {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--muted);
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* ─── DIVIDER ─── */
+  .divider {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 48px;
+  }
+  .divider-inner { height: 1px; background: var(--border-soft); }
+
+  /* ─── SCROLL REVEAL ─── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ─── TECH PILLS ─── */
+  .tech-section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
+  .tech-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 40px;
+  }
+  .tech-pill {
+    padding: 9px 18px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--muted);
+    transition: all 0.2s;
+    cursor: default;
+    background: var(--surface);
+  }
+  .tech-pill:hover {
+    border-color: rgba(167,139,250,0.3);
+    color: var(--accent);
+    background: rgba(167,139,250,0.06);
+  }
+
+  @media (max-width: 900px) {
+    nav { padding: 16px 24px; }
+    nav ul { display: none; }
+    .hero { padding: 100px 24px 60px; }
+    .hero-stats { flex-wrap: wrap; }
+    section, .analyzer-section, .how-section, .features-section,
+    .threats-section, .tech-section, .metrics-section { padding: 60px 24px; }
+    .analyzer-grid { grid-template-columns: 1fr; }
+    .pipeline { grid-template-columns: repeat(2, 1fr); }
+    .features-grid { grid-template-columns: 1fr; }
+    .threat-grid { grid-template-columns: 1fr; }
+    .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    .sample-profiles-grid { grid-template-columns: 1fr; }
+    footer { padding: 40px 24px; }
+  }
+</style>
+</head>
+<body>
+
+
+<nav>
+  <a href="#" class="logo">
+    <div class="logo-icon">🛡</div>
+    Profile<span>Guard</span>
+  </a>
+  <ul>
+    <li><a href="#analyzer">Analyzer</a></li>
+    <li><a href="#how">How it Works</a></li>
+    <li><a href="#features">Features</a></li>
+   
+  </ul>
+  <a href="#analyzer" class="nav-cta">Run Detection</a>
+</nav>
+
+
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-orb orb1"></div>
+  <div class="hero-orb orb2"></div>
+  <div class="hero-orb orb3"></div>
+
+  <div class="status-badge">
+    <span class="status-dot"></span>
+    ML Engine Online — System Active
+  </div>
+
+  <h1>
+    <span class="h1-line1">Detect Fake</span>
+    <span class="h1-line2">Profiles</span>
+    <span class="h1-line1"><span class="h1-accent">Instantly.</span></span>
+  </h1>
+
+  <p class="hero-sub">
+    Advanced machine learning and deep learning system that analyzes social media profiles in real-time. Classify accounts as real or fake using behavioral patterns, activity signals, and network topology.
+  </p>
+
+  <div class="hero-ctas">
+    <a href="#analyzer" class="btn-primary">🔍 Analyze Profile</a>
+    <a href="#how" class="btn-outline">Learn How It Works →</a>
+    <a href="#features" class="btn-outline">View Features →</a>
+  </div>
+
+  <div class="hero-stats">
+    <div class="stat">
+      <span class="stat-num" id="stat1">85%</span>
+      <span class="stat-label">Detection Accuracy</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num" id="stat3">5%</span>
+      <span class="stat-label">False Positive Rate</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num" id="stat4">30</span>
+      <span class="stat-label">ms Avg Response</span>
+    </div>
+  </div>
+</div>
+
+<!-- SAMPLE PROFILES -->
+<div class="analyzer-section" id="samples" style="padding-bottom:0;">
+  <div class="section-tag">Try It Now</div>
+  <h2 class="section-title">Sample Profiles</h2>
+  <p style="color:var(--muted);font-size:0.85rem;margin-bottom:32px;max-width:560px;line-height:1.7;">
+    Click any sample below to auto-load it into the analyzer and see how the detection engine classifies it.
+  </p>
+
+  <div class="sample-profiles-grid">
+    <div class="sample-card fake-sample" onclick="loadSample('bot_army99', 'twitter', 1, 12, 8500, 45.0, 15, 'Reposts same content repeatedly, posts at 3am every night, identical captions')">
+      <div class="sample-top-bar"></div>
+      <div class="sample-avatar" style="background:linear-gradient(135deg,rgba(251,113,133,0.15),rgba(244,63,94,0.08)); border: 1px solid rgba(251,113,133,0.2);">🤖</div>
+      <div class="sample-info">
+        <div class="sample-name">@bot_army99 <span class="sample-badge fake-badge">FAKE</span></div>
+        <div class="sample-platform">Twitter / X</div>
+        <div class="sample-signals">
+          <span class="sig-pill red">1 month old</span>
+          <span class="sig-pill red">8,500 following</span>
+          <span class="sig-pill red">45 posts/day</span>
+          <span class="sig-pill red">15% complete</span>
+        </div>
+        <p class="sample-desc">Classic bot account. Extremely new, follows thousands but almost no followers, posts flood at unnatural hours, profile barely filled out.</p>
+      </div>
+      <div class="sample-arrow">→</div>
+    </div>
+
+    <div class="sample-card fake-sample" onclick="loadSample('totally_real_jane', 'instagram', 2, 150, 4900, 22.0, 25, 'No profile picture, bio is empty, all posts are promotional links, never interacts with others')">
+      <div class="sample-top-bar"></div>
+      <div class="sample-avatar" style="background:linear-gradient(135deg,rgba(251,113,133,0.15),rgba(244,63,94,0.08)); border: 1px solid rgba(251,113,133,0.2);">👤</div>
+      <div class="sample-info">
+        <div class="sample-name">@totally_real_jane <span class="sample-badge fake-badge">FAKE</span></div>
+        <div class="sample-platform">Instagram</div>
+        <div class="sample-signals">
+          <span class="sig-pill red">2 months old</span>
+          <span class="sig-pill red">4,900 following</span>
+          <span class="sig-pill red">22 posts/day</span>
+          <span class="sig-pill red">25% complete</span>
+        </div>
+        <p class="sample-desc">Impersonator profile with stolen photo, empty bio, and mass-following. Posts only promotional links with zero genuine engagement.</p>
+      </div>
+      <div class="sample-arrow">→</div>
+    </div>
+
+    <div class="sample-card fake-sample" onclick="loadSample('news_spreader_2024', 'facebook', 3, 300, 7200, 30.0, 20, 'Only reposts political content, no personal photos, joined recently, suspicious follower spike')">
+      <div class="sample-top-bar"></div>
+      <div class="sample-avatar" style="background:linear-gradient(135deg,rgba(251,113,133,0.15),rgba(244,63,94,0.08)); border: 1px solid rgba(251,113,133,0.2);">📢</div>
+      <div class="sample-info">
+        <div class="sample-name">@news_spreader_2024 <span class="sample-badge fake-badge">FAKE</span></div>
+        <div class="sample-platform">Facebook</div>
+        <div class="sample-signals">
+          <span class="sig-pill red">3 months old</span>
+          <span class="sig-pill red">7,200 following</span>
+          <span class="sig-pill red">30 posts/day</span>
+          <span class="sig-pill red">20% complete</span>
+        </div>
+        <p class="sample-desc">Misinformation bot. Posts exclusively inflammatory political content, no personal information, suspicious follower spikes every 48 hours.</p>
+      </div>
+      <div class="sample-arrow">→</div>
+    </div>
+
+    <div class="sample-card real-sample" onclick="loadSample('sarah_designs', 'instagram', 48, 2100, 890, 1.2, 92, 'Posts original artwork, personal photos, replies to comments, consistent aesthetic')">
+      <div class="sample-top-bar"></div>
+      <div class="sample-avatar" style="background:linear-gradient(135deg,rgba(52,211,153,0.15),rgba(16,185,129,0.08)); border: 1px solid rgba(52,211,153,0.2);">🎨</div>
+      <div class="sample-info">
+        <div class="sample-name">@sarah_designs <span class="sample-badge real-badge">REAL</span></div>
+        <div class="sample-platform">Instagram</div>
+        <div class="sample-signals">
+          <span class="sig-pill green">48 months old</span>
+          <span class="sig-pill green">2,100 followers</span>
+          <span class="sig-pill green">1.2 posts/day</span>
+          <span class="sig-pill green">92% complete</span>
+        </div>
+        <p class="sample-desc">Genuine creative professional. Consistent original content, healthy follower ratio, complete profile with bio and real photos, regular human engagement patterns.</p>
+      </div>
+      <div class="sample-arrow">→</div>
+    </div>
+
+    <div class="sample-card real-sample" onclick="loadSample('prof_john_carter', 'linkedin', 84, 3400, 620, 0.4, 98, 'Work history, education filled, endorsements, connects with colleagues, posts industry articles')">
+      <div class="sample-top-bar"></div>
+      <div class="sample-avatar" style="background:linear-gradient(135deg,rgba(56,189,248,0.15),rgba(14,165,233,0.08)); border: 1px solid rgba(56,189,248,0.2);">💼</div>
+      <div class="sample-info">
+        <div class="sample-name">@prof_john_carter <span class="sample-badge real-badge">REAL</span></div>
+        <div class="sample-platform">LinkedIn</div>
+        <div class="sample-signals">
+          <span class="sig-pill green">84 months old</span>
+          <span class="sig-pill green">3,400 followers</span>
+          <span class="sig-pill green">0.4 posts/day</span>
+          <span class="sig-pill green">98% complete</span>
+        </div>
+        <p class="sample-desc">Established academic with complete work history, education credentials, mutual connections, and thoughtful long-form posts about industry topics.</p>
+      </div>
+      <div class="sample-arrow">→</div>
+    </div>
+
+    <div class="sample-card real-sample" onclick="loadSample('samantharuthprabhuoffl', 'instagram', 144, 28500000, 210, 0.5, 99, 'Verified celebrity account, posts personal photos, movie promotions, brand deals, genuine fan interactions, consistent posting history since 2013')">
+      <div class="sample-top-bar"></div>
+      <div class="sample-avatar" style="background:linear-gradient(135deg,rgba(249,168,212,0.15),rgba(219,39,119,0.08)); border: 1px solid rgba(249,168,212,0.2);">🌟</div>
+      <div class="sample-info">
+        <div class="sample-name">@samantharuthprabhuoffl <span class="sample-badge real-badge">REAL ✓</span></div>
+        <div class="sample-platform">Instagram · Celebrity</div>
+        <div class="sample-signals">
+          <span class="sig-pill green">12+ years old</span>
+          <span class="sig-pill green">28.5M followers</span>
+          <span class="sig-pill green">0.5 posts/day</span>
+          <span class="sig-pill green">99% complete</span>
+        </div>
+        <p class="sample-desc">Verified South Indian actress & producer. Consistent real-world identity, blue tick, massive authentic following, personal life posts, film promos & brand collaborations.</p>
+      </div>
+      <div class="sample-arrow">→</div>
+    </div>
+
+    <div class="sample-card borderline-sample" onclick="loadSample('crypto_mike88', 'twitter', 8, 420, 3100, 8.0, 45, 'Mostly retweets crypto news, some original posts, no profile picture but has bio')">
+      <div class="sample-top-bar"></div>
+      <div class="sample-avatar" style="background:linear-gradient(135deg,rgba(251,191,36,0.15),rgba(245,158,11,0.08)); border: 1px solid rgba(251,191,36,0.2);">⚠️</div>
+      <div class="sample-info">
+        <div class="sample-name">@crypto_mike88 <span class="sample-badge warn-badge">SUSPICIOUS</span></div>
+        <div class="sample-platform">Twitter / X</div>
+        <div class="sample-signals">
+          <span class="sig-pill orange">8 months old</span>
+          <span class="sig-pill red">3,100 following</span>
+          <span class="sig-pill orange">8 posts/day</span>
+          <span class="sig-pill orange">45% complete</span>
+        </div>
+        <p class="sample-desc">Borderline case. Some genuine activity but suspicious following behavior, missing profile photo, and high posting frequency around market hours only.</p>
+      </div>
+      <div class="sample-arrow">→</div>
+    </div>
+  </div>
+</div>
+
+<!-- ANALYZER -->
+<div class="analyzer-section" id="analyzer">
+  <div class="section-tag">Detection Engine</div>
+  <h2 class="section-title">Profile Analyzer</h2>
+  <p style="color:var(--muted);font-size:0.85rem;margin-bottom:40px;max-width:520px;line-height:1.7;">
+    Input profile metadata and behavioral signals. The ML engine scores each dimension and returns a fake-probability verdict.
+  </p>
+
+  <div class="analyzer-wrapper">
+    <div class="analyzer-grid">
+      <!-- INPUT PANEL -->
+      <div>
+        <div class="input-group">
+          <label>Profile Username</label>
+          <input type="text" id="username" placeholder="@username" />
+        </div>
+        <div class="input-group">
+          <label>Platform</label>
+          <select id="platform">
+            <option value="twitter">Twitter / X</option>
+            <option value="instagram">Instagram</option>
+            <option value="facebook">Facebook</option>
+            <option value="linkedin">LinkedIn</option>
+          </select>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-row">
+            <label>Account Age (months)</label>
+            <span class="slider-val" id="age-val">12</span>
+          </div>
+          <input type="range" id="account-age" min="0" max="144" value="12"
+            oninput="document.getElementById('age-val').textContent=this.value">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-row">
+            <label>Followers Count</label>
+            <span class="slider-val" id="fol-val">150</span>
+          </div>
+          <input type="range" id="followers" min="0" max="10000" value="150"
+            oninput="document.getElementById('fol-val').textContent=parseInt(this.value).toLocaleString()">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-row">
+            <label>Following Count</label>
+            <span class="slider-val" id="fng-val">800</span>
+          </div>
+          <input type="range" id="following" min="0" max="10000" value="800"
+            oninput="document.getElementById('fng-val').textContent=parseInt(this.value).toLocaleString()">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-row">
+            <label>Posts Per Day</label>
+            <span class="slider-val" id="ppd-val">5.0</span>
+          </div>
+          <input type="range" id="posts-per-day" min="0" max="50" value="5" step="0.5"
+            oninput="document.getElementById('ppd-val').textContent=parseFloat(this.value).toFixed(1)">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-row">
+            <label>Profile Completeness %</label>
+            <span class="slider-val" id="comp-val">40%</span>
+          </div>
+          <input type="range" id="completeness" min="0" max="100" value="40"
+            oninput="document.getElementById('comp-val').textContent=this.value+'%'">
+        </div>
+
+        <div class="input-group">
+          <label>Behavioral Flags (optional notes)</label>
+          <textarea id="notes" rows="2" placeholder="e.g. mostly reposts, no original content, odd posting hours..."></textarea>
+        </div>
+
+        <button class="analyze-btn" onclick="runAnalysis()">🔍 Run Detection Analysis</button>
+      </div>
+
+      <!-- RESULT PANEL -->
+      <div class="result-panel">
+        <div class="result-header">
+          <span>Detection Result</span>
+          <span id="result-status" style="color:var(--muted);font-size:0.65rem;font-family:'JetBrains Mono',monospace;">AWAITING INPUT</span>
+        </div>
+
+        <div id="idle-state" class="result-idle">
+          <div class="idle-icon">🛡</div>
+          <p class="idle-text">Submit profile data<br>to begin analysis</p>
+        </div>
+
+        <div id="loading-state" class="loading">
+          <div class="loader-bars">
+            <div class="loader-bar"></div>
+            <div class="loader-bar"></div>
+            <div class="loader-bar"></div>
+            <div class="loader-bar"></div>
+            <div class="loader-bar"></div>
+            <div class="loader-bar"></div>
+          </div>
+          <span class="loader-text">Analyzing profile vectors...</span>
+        </div>
+
+        <div id="verdict-state" class="verdict">
+          <div class="verdict-score">
+            <div class="score-ring">
+              <svg viewBox="0 0 100 100">
+                <circle class="ring-bg" cx="50" cy="50" r="45"/>
+                <circle class="ring-fill" id="ring-fill" cx="50" cy="50" r="45"/>
+              </svg>
+              <!-- <div class="score-num" id="score-num">0%</div> -->
+              <div class="score-num" id="score-num" style="font-size:2rem;"></div>
+            </div>
+            <span class="verdict-label" id="verdict-label"></span>
+          </div>
+
+          <div class="metric-bars">
+            <div class="metric-bar-item">
+              <div class="metric-bar-label"><span>Bot Behavior Score</span><span id="b1v">0%</span></div>
+              <div class="bar-track"><div class="bar-fill danger" id="b1"></div></div>
+            </div>
+            <div class="metric-bar-item">
+              <div class="metric-bar-label"><span>Network Anomaly</span><span id="b2v">0%</span></div>
+              <div class="bar-track"><div class="bar-fill danger" id="b2"></div></div>
+            </div>
+            <div class="metric-bar-item">
+              <div class="metric-bar-label"><span>Profile Authenticity</span><span id="b3v">0%</span></div>
+              <div class="bar-track"><div class="bar-fill safe" id="b3"></div></div>
+            </div>
+            <div class="metric-bar-item">
+              <div class="metric-bar-label"><span>Activity Legitimacy</span><span id="b4v">0%</span></div>
+              <div class="bar-track"><div class="bar-fill safe" id="b4"></div></div>
+            </div>
+          </div>
+
+          <div class="verdict-flags" id="verdict-flags"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"><div class="divider-inner"></div></div>
+
+<!-- HOW IT WORKS -->
+
+<section id="how" class="how-section">
+
+  <div class="section-tag">System Architecture</div>
+  <h2 class="section-title">How Detection Works</h2>
+  <p style="color:var(--muted);font-size:0.85rem;margin-bottom:0;max-width:520px;line-height:1.7;">
+    A four-stage pipeline processes each profile through feature extraction, behavioral modeling, graph analysis, and final classification.
+  </p>
+
+  <div class="pipeline">
+    <div class="pipe-step">
+      <span class="pipe-num">01</span>
+      <div class="pipe-icon">📥</div>
+      <div class="pipe-title">Data Ingestion</div>
+      <p class="pipe-desc">Collects raw profile metadata: bio, profile photo, account age, follower/following ratios, post history, and interaction patterns via API connectors.</p>
+    </div>
+    <div class="pipe-step">
+      <span class="pipe-num">02</span>
+      <div class="pipe-icon">🔬</div>
+      <div class="pipe-title">Feature Extraction</div>
+      <p class="pipe-desc">Transforms raw data into 47 engineered features — temporal signals, linguistic markers, posting entropy, and network centrality scores.</p>
+    </div>
+    <div class="pipe-step">
+      <span class="pipe-num">03</span>
+      <div class="pipe-icon">🧠</div>
+      <div class="pipe-title">ML Classification</div>
+      <p class="pipe-desc">Ensemble model (Random Forest + LSTM + GNN) votes on fake probability. Deep learning handles sequential post patterns; graph networks model social topology.</p>
+    </div>
+    <div class="pipe-step">
+      <span class="pipe-num">04</span>
+      <div class="pipe-icon">⚖️</div>
+      <div class="pipe-title">Verdict & Report</div>
+      <p class="pipe-desc">Final score (0–100%) with confidence interval, threat flags, and explainability report. Results logged for retraining and continuous improvement.</p>
+    </div>
+  </div>
+
+  
+
+</section>
+<!-- FEATURES -->
+
+ <section id="features" class="features-section">
+
+  <div class="section-tag">Capabilities</div>
+  <h2 class="section-title">Detection Features</h2>
+
+  <div class="features-grid">
+    
+    <div class="feature-card">
+      <span class="feat-icon">🤖</span>
+      <div class="feat-title">Bot Pattern Detection</div>
+      <p class="feat-desc">
+        Identifies automated posting behavior using temporal analysis.
+      </p>
+    </div>
+
+    <div class="feature-card">
+      <span class="feat-icon">🕸️</span>
+      <div class="feat-title">Graph Network Analysis</div>
+      <p class="feat-desc">
+        Detects fake networks and suspicious connections.
+      </p>
+    </div>
+
+    <div class="feature-card">
+      <span class="feat-icon">🖼️</span>
+      <div class="feat-title">Stolen Image Detection</div>
+      <p class="feat-desc">
+        Finds stolen or AI-generated profile images.
+      </p>
+    </div>
+
+    <div class="feature-card">
+      <span class="feat-icon">📊</span>
+      <div class="feat-title">Behavioral Profiling</div>
+      <p class="feat-desc">
+        Analyzes user behavior patterns over time.
+      </p>
+    </div>
+
+    <div class="feature-card">
+      <span class="feat-icon">💬</span>
+      <div class="feat-title">NLP Content Analysis</div>
+      <p class="feat-desc">
+        Detects spam and fake content using AI.
+      </p>
+    </div>
+
+    <div class="feature-card">
+      <span class="feat-icon">⚡</span>
+      <div class="feat-title">Real-Time Scoring</div>
+      <p class="feat-desc">
+        Gives instant fake/real score.
+      </p>
+    </div>
+
+  </div>
+
+</section>
+ 
+
+
+<!-- THREATS -->
+<div class="threats-section reveal">
+  <div class="section-tag">Threat Landscape</div>
+  <h2 class="section-title">What We Protect Against</h2>
+
+  <div class="threat-grid">
+    <div class="threat-card">
+      <div class="threat-icon-box">🎭</div>
+      <div class="threat-info">
+        <h3>Identity Theft</h3>
+        <p>Impersonators clone real user profiles to deceive contacts, extract personal information, or damage reputations through fabricated content.</p>
+      </div>
+    </div>
+    <div class="threat-card">
+      <div class="threat-icon-box">📢</div>
+      <div class="threat-info">
+        <h3>Misinformation Campaigns</h3>
+        <p>Coordinated networks of fake accounts amplify false narratives, manipulate trending topics, and artificially boost engagement on misleading content.</p>
+      </div>
+    </div>
+    <div class="threat-card">
+      <div class="threat-icon-box">💸</div>
+      <div class="threat-info">
+        <h3>Social Engineering Fraud</h3>
+        <p>Fake profiles build false trust to execute romance scams, investment fraud, phishing attacks, and impersonation of trusted institutions.</p>
+      </div>
+    </div>
+    <div class="threat-card">
+      <div class="threat-icon-box">😰</div>
+      <div class="threat-info">
+        <h3>Cyberbullying & Harassment</h3>
+        <p>Anonymous fake accounts used to target individuals with coordinated harassment campaigns, doxxing threats, and psychological abuse.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-bottom">
+    <span>© 2025 ProfileGuard — Fake Profile Detection System</span>
+    <span>Built with ML &amp; Deep Learning</span>
+  </div>
+</footer>
+<script>
+function loadSample(username, platform, age, followers, following, ppd, completeness, notes) {
+  document.querySelectorAll('.sample-card').forEach(c => c.classList.remove('active-sample'));
+  event.currentTarget.classList.add('active-sample');
+
+  document.getElementById('username').value = '@' + username;
+
+  const platSelect = document.getElementById('platform');
+  for (let i = 0; i < platSelect.options.length; i++) {
+    if (platSelect.options[i].value === platform) {
+      platSelect.selectedIndex = i;
+      break;
+    }
+  }
+
+  document.getElementById('account-age').value = age;
+  document.getElementById('age-val').textContent = age;
+
+  document.getElementById('followers').value = followers;
+  document.getElementById('fol-val').textContent = followers.toLocaleString();
+
+  document.getElementById('following').value = following;
+  document.getElementById('fng-val').textContent = following.toLocaleString();
+
+  document.getElementById('posts-per-day').value = ppd;
+  document.getElementById('ppd-val').textContent = ppd.toFixed(1);
+
+  document.getElementById('completeness').value = completeness;
+  document.getElementById('comp-val').textContent = completeness + '%';
+
+  document.getElementById('notes').value = notes;
+
+  document.getElementById('analyzer').scrollIntoView({ behavior: 'smooth' });
+
+  setTimeout(() => runAnalysis(), 600);
+}
+
+function runAnalysis() {
+  const age = parseInt(document.getElementById('account-age').value);
+  const followers = parseInt(document.getElementById('followers').value);
+  const following = parseInt(document.getElementById('following').value);
+  const ppd = parseFloat(document.getElementById('posts-per-day').value);
+  const completeness = parseInt(document.getElementById('completeness').value);
+
+  document.getElementById('idle-state').style.display = 'none';
+  document.getElementById('verdict-state').classList.remove('active');
+  document.getElementById('loading-state').classList.add('active');
+
+  document.getElementById('result-status').textContent = 'PROCESSING...';
+
+  setTimeout(() => {
+    let fakeScore = 0;
+    const signals = [];
+
+    const ratio = following > 0 ? followers / following : 0;
+
+    if (ratio < 0.1) { fakeScore += 25; signals.push({ t: 'Low F/F Ratio', r: true }); }
+    else { signals.push({ t: 'Normal Ratio', r: false }); }
+
+    if (age < 3) { fakeScore += 20; signals.push({ t: 'New Account', r: true }); }
+    else { signals.push({ t: 'Established Account', r: false }); }
+
+    if (ppd > 20) { fakeScore += 22; signals.push({ t: 'Excessive Posting', r: true }); }
+    else { signals.push({ t: 'Normal Activity', r: false }); }
+
+    if (completeness < 30) { fakeScore += 20; signals.push({ t: 'Incomplete Profile', r: true }); }
+    else { signals.push({ t: 'Complete Profile', r: false }); }
+
+    if (following > 5000 && followers < 100) {
+      fakeScore += 15;
+      signals.push({ t: 'Mass Following', r: true });
+    }
+
+    fakeScore = Math.min(99, Math.max(1, fakeScore));
+
+    const isFake = fakeScore >= 55;
+
+    document.getElementById('loading-state').classList.remove('active');
+    const verdict = document.getElementById('verdict-state');
+    verdict.classList.add('active');
+
+    // ✅ STATUS TEXT
+    document.getElementById('result-status').textContent = isFake ? '⚠ SUSPICIOUS' : '✓ SAFE';
+    document.getElementById('result-status').style.color = isFake ? '#f472b6' : '#34d399';
+
+    // ✅ EMOJI IN CIRCLE
+    const emoji = isFake ? '😞' : '😊';
+    document.getElementById('score-num').textContent = emoji;
+
+    // ❌ REMOVE LABEL TEXT
+    document.getElementById('verdict-label').textContent = '';
+
+    // RING COLOR
+    const ring = document.getElementById('ring-fill');
+    ring.style.stroke = isFake ? '#f472b6' : '#34d399';
+    ring.style.strokeDashoffset = 0;
+
+    // METRICS
+    const botScore = fakeScore;
+    const networkAnom = fakeScore * 0.8;
+    const authenticity = 100 - fakeScore;
+    const activityLeg = 100 - fakeScore * 0.7;
+
+    const bars = [
+      { id: 'b1', vid: 'b1v', val: Math.round(botScore) },
+      { id: 'b2', vid: 'b2v', val: Math.round(networkAnom) },
+      { id: 'b3', vid: 'b3v', val: Math.round(authenticity) },
+      { id: 'b4', vid: 'b4v', val: Math.round(activityLeg) },
+    ];
+
+    bars.forEach(b => {
+      document.getElementById(b.vid).textContent = b.val + '%';
+      document.getElementById(b.id).style.width = b.val + '%';
+    });
+
+    // FLAGS
+    const flagsEl = document.getElementById('verdict-flags');
+    flagsEl.innerHTML = '';
+
+    signals.forEach(s => {
+      const span = document.createElement('span');
+      span.className = 'flag ' + (s.r ? 'red' : 'green');
+      span.textContent = s.t;
+      flagsEl.appendChild(span);
+    });
+
+  }, 1500);
+}
+
+
+const reveals = document.querySelectorAll('.reveal');
+
+window.addEventListener('scroll', () => {
+  reveals.forEach(el => {
+    const top = el.getBoundingClientRect().top;
+    const windowHeight = window.innerHeight;
+
+    if (top < windowHeight - 100) {
+      el.style.opacity = 1;
+      el.style.transform = "translateY(0)";
+    }
+  });
+});
+
+</script>
+
+</body>
+</html>
